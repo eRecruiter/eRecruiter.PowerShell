@@ -108,7 +108,7 @@ $policy = $($currentSetting)
 	    Push-Location (Split-Path $tmp2)
 	
 	    try {
-		    secedit.exe /configure /db "secedit.sdb" /cfg "$($tmp2)" /areas USER_RIGHTS 
+		    secedit.exe /configure /db "secedit.sdb" /cfg "$($tmp2)" /areas USER_RIGHTS | Out-Null
 	    } finally {	
 		    Pop-Location
 	    }
