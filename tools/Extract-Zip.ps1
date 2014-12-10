@@ -7,7 +7,7 @@ function Extract-Zip
     )
 
     # make sure the destination directory exists
-    New-Item -ItemType Directory -Force -Path $destination
+    New-Item -ItemType Directory -Force -Path $destination | Out-Null
 
     $shell = new-object -com shell.application
     $zip = $shell.NameSpace($file)
