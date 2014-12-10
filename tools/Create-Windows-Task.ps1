@@ -64,17 +64,13 @@ function Grant-Logon-As-Batch-Job ($user) {
 	    $sidstr = $null
     }
 
-    Write-Host "Account: $($user)."
-
     if ([string]::IsNullOrEmpty($sidstr)) {
 	    Write-Host "Account not found."
 	    exit -1
     }
 
-    Write-Host "Account SID: $($sidstr)."
 
     $tmp = [System.IO.Path]::GetTempFileName()
-    Write-Host "Exporting current Local Security Policy ..."
     secedit.exe /export /cfg "$($tmp)" 
 
     $c = Get-Content -Path $tmp 
@@ -88,15 +84,13 @@ function Grant-Logon-As-Batch-Job ($user) {
     }
 
     if ($currentSetting -notlike "*$($sidstr)*") {
-	    Write-Host "Modifying setting 'Logon as Batch Job' ..."
-	
+
 	    if ([string]::IsNullOrEmpty($currentSetting)) {
 		    $currentSetting = "*$($sidstr)"
 	    } else {
 		    $currentSetting = "*$($sidstr),$($currentSetting)"
 	    }
-	
-	    Write-Host "$currentSetting"
+
 	
 	$outfile = @"
 [Unicode]
@@ -109,7 +103,6 @@ $policy = $($currentSetting)
 "@
 	    $tmp2 = [System.IO.Path]::GetTempFileName()
 
-	    Write-Host "Importing new settings to Local Security Policy ..."
 	    $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force
 
 	    Push-Location (Split-Path $tmp2)
@@ -120,8 +113,6 @@ $policy = $($currentSetting)
 		    Pop-Location
 	    }
     } else {
-	    Write-Host "Account already in 'Logon as Batch Job'."
+	    
     }
-
-    Write-Host "Done."
 }
