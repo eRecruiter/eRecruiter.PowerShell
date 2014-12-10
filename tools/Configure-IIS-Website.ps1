@@ -14,14 +14,14 @@ function Create-AppPool-And-Website {
     Create-AppPool $websiteName $userName $password
 
     Delete-Website-If-Exists $websiteName
-    New-Item IIS:\Sites\$websiteName -Bindings @{protocol="http";bindingInformation="*:80:"} -PhysicalPath $path
-    Set-ItemProperty IIS:\Sites\$websiteName -name applicationPool -value $websiteName
+    New-Item IIS:\Sites\$websiteName -Bindings @{protocol="http";bindingInformation="*:80:"} -PhysicalPath $path | Out-Null
+    Set-ItemProperty IIS:\Sites\$websiteName -name applicationPool -value $websiteName | Out-Null
 
     $website = Get-Item IIS:\Sites\$websiteName
     $website.LogFile.Directory = $logPath
     $website.LogFile.LogExtFileFlags = "Date,Time,ClientIP, UserName, SiteName, ComputerName, ServerIP, Method, UriStem, UriQuery, HttpStatus, Win32Status, BytesSent, BytesRecv, TimeTaken, ServerPort, UserAgent, Cookie, Referer, ProtocolVersion, Host, HttpSubStatus"
 
-    $website | Set-Item
+    $website | Set-Item | Out-Null
 
     Remove-All-Bindings $websiteName
 }

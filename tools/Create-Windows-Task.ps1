@@ -103,7 +103,7 @@ $policy = $($currentSetting)
 "@
 	    $tmp2 = [System.IO.Path]::GetTempFileName()
 
-	    $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force
+	    $outfile | Set-Content -Path $tmp2 -Encoding Unicode -Force | Out-Null
 
 	    Push-Location (Split-Path $tmp2)
 	
