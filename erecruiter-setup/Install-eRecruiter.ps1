@@ -1,9 +1,14 @@
+# TODO : The following steps are not covered by this automatic routine (yet)
+# - Install certificates
+# - Set user rights to application directories
+
+
 # The name of the customer, to enable more than one eRecruiter installation on a single server
 # No spaces or other special characters please
 $customerName = "Customer_Name"
 
 # The URL to the ZIP package that contains the application source
-$sourceUrl = "http://staging.epunkt.net/eRecruiter.zip"
+$sourceUrl = "http://staging.epunkt.net/eR_Without_Customization.zip"
 
 # The directory to install the applications to
 # WARNING: All existing files in this directory will be deleted!
