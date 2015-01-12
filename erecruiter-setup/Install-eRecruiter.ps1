@@ -56,33 +56,21 @@ function Configure-eRecruiter-Settings() {
 
 
 Write-Host "Good day to you. Checking your privileges ..."
-$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
-if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -eq $false) {
-    Write-Host "Administrative (elevated) privileges are required. Exiting ..." -ForegroundColor Yellow
-    exit -1
-}
+iex (New-Object System.Net.WebClient).DownloadString("https://raw.githubusercontent.com/eRecruiter/eRecruiter.PowerShell/master/tools/Check-Elevation.ps1")
+Check-Elevation-And-Exit-If-Necessary
 
 
 
 Write-Host "Validating user credentials ..."
-Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-$principalContext = "Machine"
-if ($username.Contains("@") -or $username.Contains("\")) {
-    $principalContext = "Domain"
-}
-$principal = New-Object System.DirectoryServices.AccountManagement.PrincipalContext($principalContext)
-if ($principal.ValidateCredentials($username, $password) -eq $false) {
-    Write-Host "Specified credentials for $username invalid. Exiting ..." -ForegroundColor Yellow
-    exit -2
-}
+iex (New-Object System.Net.WebClient).DownloadString("https://raw.githubusercontent.com/eRecruiter/eRecruiter.PowerShell/master/tools/Check-Credentials.ps1")
+Check-Credentials-And-Exit-If-Necessary $username $password
 
 
 
 Write-Host "Installing necessary IIS/ASP.NET modules ..."
 Import-Module ServerManager
 # this also installs a lot of dependencies
-Add-WindowsFeature -Name Web-Asp-Net45,Web-Mgmt-Console | Out-Null
+Add-WindowsFeature -Name Web-Asp-Net45,Web-Mgmt-Console,Web-Dir-Browsing,Web-Http-Errors,Web-Static-Content,Web-Http-Logging,Web-Stat-Compression | Out-Null
 
 
 
