@@ -1,7 +1,7 @@
 function Check-Credentials-And-Exit-If-Necessary {
     param(
-        [parameter(mandatory=$true)] [string] $username,
-		[parameter(mandatory=$true)] [string] $password,
+        	[parameter(mandatory=$true)] [string] $username,
+		[parameter(mandatory=$true)] [string] $password
 	)
 
 	Add-Type -AssemblyName System.DirectoryServices.AccountManagement
