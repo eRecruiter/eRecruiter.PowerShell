@@ -81,8 +81,8 @@ if ($principal.ValidateCredentials($username, $password) -eq $false) {
 
 Write-Host "Installing necessary IIS/ASP.NET modules ..."
 Import-Module ServerManager
-# this also install a lot of dependencies
-Add-WindowsFeature -Name Web-Asp-Net45
+# this also installs a lot of dependencies
+Add-WindowsFeature -Name Web-Asp-Net45,Web-Mgmt-Console | Out-Null
 
 
 
