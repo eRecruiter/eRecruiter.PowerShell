@@ -79,6 +79,13 @@ if ($principal.ValidateCredentials($username, $password) -eq $false) {
 
 
 
+Write-Host "Installing necessary IIS/ASP.NET modules ..."
+Import-Module ServerManager
+# this also install a lot of dependencies
+Add-WindowsFeature -Name Web-Asp-Net45
+
+
+
 Write-Host "Downloading the source ZIP package ..."
 $tempPackageFile = Join-Path $installationDirectory "temp_source.zip"
 Invoke-WebRequest $sourceUrl -OutFile $tempPackageFile
