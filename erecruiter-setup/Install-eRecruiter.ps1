@@ -30,9 +30,9 @@ $peripheryDataUrl = "......er-install-package.zip"
 # WARNING: All existing files in this directory will be deleted!
 $installationDirectory = "c:\eRecruiter"
 
-# Whether or not to install the FileServer (PDF & video) service, CronWorker (maintenance) task, 
+# Whether or not to install the eRecruiter Media Service (PDF & video) [former known as FileServer] , CronWorker (maintenance) task, 
 # templates and iFilter packages
-$includeFileServer = $true
+$includeMediaService = $true
 $includeCronWorker = $true
 $includeTemplates = $true
 $includeiFilter = $true
@@ -153,10 +153,10 @@ Write-Host "(7) Stopping IIS and removing existing applications ..."
 net stop W3SVC | Out-Null
 $applicationsDirectory = (Join-Path $installationDirectory "/Bin")
 if (Test-Path $applicationsDirectory) {
-    if (Get-Service "eR-FileServer" -ErrorAction SilentlyContinue)
+    if (Get-Service "eR-MediaService" -ErrorAction SilentlyContinue) 
     {
-        net stop "eR-FileServer" | Out-Null
-        sc.exe delete "eR-FileServer" | Out-Null
+        net stop "eR-MediaService" | Out-Null
+        sc.exe delete "eR-MediaService" | Out-Null
     }
     Remove-Item -Recurse -Force $applicationsDirectory | Out-Null
 }
@@ -194,16 +194,16 @@ $tempPath = (Get-ChildItem -Path $tempPackageDirectory -Filter "ApplicantPortal"
 Copy-Item -path $tempPath -destination $applicationsDirectory -Recurse
 
 
-# Step (9) -- install eRecruiter file server
-############################################
-if ($includeFileServer) {
+# Step (9) -- install eRecruiter Media Service (Fileserver)
+###########################################################
+if ($includeMediaService) {
     $tempPath = (Get-ChildItem -Path $tempPackageDirectory -Filter "FileServer" -Recurse) | % { $_.FullName } | Select-Object -first 1
     Copy-Item -path $tempPath -destination $applicationsDirectory -Recurse
 
-    Write-Host "(9) Installing FileServer service ..."
+    Write-Host "(9) Installing eRecruiter Media Service ..."
     $fileServerExecuteablePath = Join-Path $applicationsDirectory "FileServer/ePunkt.FileServer.exe"
-    sc.exe create "eR-FileServer" Binpath= "$fileServerExecuteablePath service=true" DisplayName= "eRecruiter FileServer" start= auto | Out-Null
-    net start "eR-FileServer" | Out-Null
+    sc.exe create "eR-MediaService" Binpath= "$fileServerExecuteablePath service=true" DisplayName= "eRecruiter Media Service" start= auto | Out-Null
+    net start "eR-MediaService" | Out-Null
 }
 
 
