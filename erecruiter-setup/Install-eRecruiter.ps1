@@ -64,7 +64,7 @@ function Configure-eRecruiter-Settings() {
     #Set-AppSetting-Recursive "SmtpUserName" "??-TypeSmtpUsernameHere-??"
     #Set-AppSetting-Recursive "SmtpPassword" "??-TypeSmtpPasswordHere-??"
 
-    Set-AppSetting-Recursive "RequireSsl" "true"
+    Set-AppSetting-Recursive "RequireSsl" "false"
     #Set-AppSetting-Recursive "Portal-MandatorId" "1" ".\Portal"
     Set-AppSetting-Recursive "MandatorId" "1" ".\ApplicantPortal"
     Set-AppSetting-Recursive "ApiEndpoint" "$apiEndpoint/api" ".\ApplicantPortal"
