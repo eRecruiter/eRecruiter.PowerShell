@@ -1,10 +1,55 @@
-# copied from https://github.com/eRecruiter/eRecruiter.PowerShell
-#
-# Prepare a given database for the eRecruiter application
-# 
+<#
+
+.Synopsis
+
+Prepares a given SQL Server database for the eRecruiter application.
+
+.Description
+
 # Requirements:
-#      - database
-#      - user with database access (default langugae "German", password never expire)    
+#   - eRecruiter database prepare SQL script which contains the DB schema and some sample data. This scripts are included in the "er-install-package.zip" file.
+#   - database
+#   - user with database access (default language "German", password never expires)   
+
+The script prepares an existing SQL database with the schema and sample data for the eRecruiter. 
+The user must have database access with the priviliges to create a database.
+
+.Parameter dbServer
+
+(Required) The path to the SQL server, which hosts the eRecruiter database. 
+Usually the path looks like SERVERNAME\INSTANCENAME.
+
+.Parameter dbName
+
+(Required) The name of the database to access.
+
+.Parameter dbUserName
+
+(Required) The database user, who has access to the database provided in parameter "dbName".
+
+.Parameter dbUserPassword
+
+(Required) The password of the database user.
+
+.Parameter scriptDirectory
+
+(Required) The directory which contains the SQL scripts "CreateEmptySchema.sql"" and "CreateEmptyData.sql".
+The scripts are found in "er-install-package.zip" file.
+If no directory is provided an error is presented.
+
+.Notes
+
+Version: 1.0
+
+#>
+
+param(
+    [parameter(mandatory=$true)] [string] $dbServer #SERVERNAME\INSTANCENAME
+    ,[parameter(mandatory=$true)] [string] $dbName #eRecruiter_DB_Name
+    ,[parameter(mandatory=$true)] [string] $dbUserName #eRecruiter_DB_User 
+    ,[parameter(mandatory=$true)] [string] $dbUserPassword #eRecruiter_DB_User_Password
+    ,[parameter(mandatory=$true)] [string] $scriptDirectory #SQL script schema and 
+    )
 
 
 # No spaces or other special characters please
@@ -15,8 +60,8 @@ $databaseUserName = "eRecruiter_DB_User"
 $databaseUserPassword = "eRecruiter_DB_User_Password"
 
 #path to sql scripts (included in er-install-package.zip)
-$sqlScriptForSchema = "C:\ENTER_PATH_HERE\CreateEmptySchema.sql"   # CreateEmptySchema.sql
-$sqlScriptForEmptyData = "C:\ENTER_PATH_HERE\CreateEmptyData.sql"  # CreateEmptyData.sql
+$sqlScriptForSchema = Join-Path $scriptDirectory "\CreateEmptySchema.sql"   # CreateEmptySchema.sql
+$sqlScriptForEmptyData = Join-Path $scriptDirectory "\CreateEmptyData.sql"  # CreateEmptyData.sql
 
 ###########################################
 function WriteWarning
@@ -97,7 +142,7 @@ try
 }
 catch [Exception]
 {
-    WriteWarning "`nAssign user as schmea owner failed!"   
+    WriteWarning "`nAssign user as schema owner failed!"   
     exit -4
 }
 
