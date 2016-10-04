@@ -2,22 +2,26 @@
 
 .Synopsis
 
+# Script available at https://github.com/eRecruiter/eRecruiter.Powershell
+
 Prepares a given SQL Server database for the eRecruiter application.
 
 .Description
 
-# Requirements:
-#   - eRecruiter database prepare SQL script which contains the DB schema and some sample data. This scripts are included in the "er-install-package.zip" file.
-#   - database
-#   - user with database access (default language "German", password never expires)   
+Requirements:
+    - eRecruiter database prepare SQL scripts which contains the DB schema and some sample data. This scripts are included in the "er-install-package.zip" file.
+    - database
+    - user with database access (default language "German", password never expires)   
 
 The script prepares an existing SQL database with the schema and sample data for the eRecruiter. 
 The user must have database access with the priviliges to create a database.
+The user credentials only have to be provided, if the current user does not have the permissions to access the database.
 
 .Parameter dbServer
 
-(Required) The path to the SQL server, which hosts the eRecruiter database. 
+(Optional) The path to the SQL server, which hosts the eRecruiter database. 
 Usually the path looks like SERVERNAME\INSTANCENAME.
+If none is provided, localhost is used.
 
 .Parameter dbName
 
@@ -25,62 +29,77 @@ Usually the path looks like SERVERNAME\INSTANCENAME.
 
 .Parameter dbUserName
 
-(Required) The database user, who has access to the database provided in parameter "dbName".
+(Optional) The database user, who has access to the database server provided in parameter "dbName".
+If none or no "dbUserPassword" is provided the current user who executes this script is used and the connection to the SQL server is made with windows authentication.
+If a value is provided the connection switches to mixed-mode authentication.
 
 .Parameter dbUserPassword
 
-(Required) The password of the database user.
+(Optional) The password of the database user provided in parameter "dbUserName".
+If no value for parameter "dbUserName" is provided, this parameter is ignored.
 
 .Parameter scriptDirectory
 
-(Required) The directory which contains the SQL scripts "CreateEmptySchema.sql"" and "CreateEmptyData.sql".
+(Optional) The directory which contains the SQL scripts "CreateEmptySchema.sql"" and "CreateEmptyData.sql".
 The scripts are found in "er-install-package.zip" file.
-If no directory is provided an error is presented.
+If no directory is provided the current directory is used. If none of the scripts is found an error is presented.
 
 .Notes
+
+No spaces or other special characters in the parameters please
 
 Version: 1.0
 
 #>
 
 param(
-    [parameter(mandatory=$true)] [string] $dbServer #SERVERNAME\INSTANCENAME
+    [string] $dbServer = "localhost" #SERVERNAME\INSTANCENAME
     ,[parameter(mandatory=$true)] [string] $dbName #eRecruiter_DB_Name
-    ,[parameter(mandatory=$true)] [string] $dbUserName #eRecruiter_DB_User 
-    ,[parameter(mandatory=$true)] [string] $dbUserPassword #eRecruiter_DB_User_Password
-    ,[parameter(mandatory=$true)] [string] $scriptDirectory #SQL script schema and 
+    ,[string] $dbUserName #eRecruiter_DB_User 
+    ,[string] $dbUserPassword #eRecruiter_DB_User_Password
+    ,[string] $scriptDirectory = $PSScriptRoot #directory with SQL scripts schema and empty data
     )
 
+function CheckPath( $path ) {
+    if ((Test-Path $path) -eq $false) {
+        Write-Error "The folder '$path' does not exist."
+        Exit
+    }
+}
 
-# No spaces or other special characters please
-$databaseServer = "SERVERNAME\INSTANCENAME" #SERVERNAME\INSTANCENAME
-$databaseName = "eRecruiter_DB_Name"
-
-$databaseUserName = "eRecruiter_DB_User"
-$databaseUserPassword = "eRecruiter_DB_User_Password"
-
-#path to sql scripts (included in er-install-package.zip)
-$sqlScriptForSchema = Join-Path $scriptDirectory "\CreateEmptySchema.sql"   # CreateEmptySchema.sql
-$sqlScriptForEmptyData = Join-Path $scriptDirectory "\CreateEmptyData.sql"  # CreateEmptyData.sql
-
-###########################################
-function WriteWarning
-{
-    param($warningText)
-
+function WriteWarning( $warningText ) {
     Write-Warning $warningText
     echo $_.Exception|format-list -force
 }
 
+# Folder structure validation
+Write-Host "Check scripts folder '$scriptDirectory'."
+CheckPath($scriptDirectory)
+
+#path to sql scripts (included in er-install-package.zip)
+$sqlScriptForSchema = Join-Path $scriptDirectory "\CreateEmptySchema.sql"   # CreateEmptySchema.sql
+$sqlScriptForEmptyData = Join-Path $scriptDirectory "\CreateEmptyData.sql"  # CreateEmptyData.sql
+# Check if files exist in the script directory
+CheckPath($sqlScriptForSchema)
+CheckPath($sqlScriptForEmptyData)
+
+###########################################
+
 [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | out-null
-$server = new-Object ('Microsoft.SqlServer.Management.Smo.Server') "$databaseServer"
+$server = new-Object ('Microsoft.SqlServer.Management.Smo.Server') "$dbServer"
 
-#Default connection is via Windows integrated, need to tell Powershell we do NOT want that
-$server.ConnectionContext.LoginSecure=$false; 
+#If user credentials are provided, check if they are valid and sign the user in
+if ([string]::IsNullOrEmpty($dbUserName) -or [string]::IsNullOrEmpty($dbUserPassword)) {
+    Write-Host "Using windows integrated connection to connect sql server."
+}
+else {
+    Write-Host "Using mixed-mode connection with provided credentials 'user: $dbUserName' to connect sql server."
+    #Default connection is via Windows integrated, need to tell Powershell we do NOT want that
+    $server.ConnectionContext.LoginSecure=$false; 
 
-$server.ConnectionContext.set_Login("$databaseUserName"); 
-$server.ConnectionContext.set_Password("$databaseUserPassword") 
-
+    $server.ConnectionContext.set_Login("$dbUserName"); 
+    $server.ConnectionContext.set_Password("$dbUserPassword") 
+}
 
 # Step (1) -- Validating user credentials
 #########################################
@@ -97,8 +116,8 @@ catch {
 
 # Step (2) -- Check if database exists
 ######################################
-Write-Host "`nCheck if database $databaseName exists ..."
-$dbObject = $server.Databases[$databaseName] #create SMO handle to database
+Write-Host "`nCheck if database $dbName exists ..."
+$dbObject = $server.Databases[$dbName] #create SMO handle to database
 
 if (!$dbObject)
 {
@@ -113,11 +132,11 @@ Write-Host "`tOK"  -ForegroundColor green
 try
 {
     Write-Host "`nCreate schema for database ..."
-    Invoke-SqlCmd -InputFile $sqlScriptForSchema -ServerInstance $server -Database $databaseName        
+    Invoke-SqlCmd -InputFile $sqlScriptForSchema -ServerInstance $server -Database $dbName        
     Write-Host "`tComplete"  -ForegroundColor green
 
     Write-Host "`nAdd initial data to database ..."
-    Invoke-SqlCmd -InputFile $sqlScriptForEmptyData -ServerInstance $server -Database $databaseName        
+    Invoke-SqlCmd -InputFile $sqlScriptForEmptyData -ServerInstance $server -Database $dbName        
     Write-Host "`tComplete"  -ForegroundColor green
 }
 catch [Exception]
@@ -135,9 +154,9 @@ try
     {
         Write-Host "`nSet owner for schema '$schema' ..."
         $dbSchema = $dbObject.Schemas[$schema]
-        $dbSchema.Owner = $databaseUserName
+        $dbSchema.Owner = $dbUserName
         $dbSchema.Alter()
-        Write-Host("`tUser $databaseUserName successfully own schema $dbSchema.") -ForegroundColor green
+        Write-Host("`tUser $dbUserName successfully own schema $dbSchema.") -ForegroundColor green
     }
 }
 catch [Exception]
@@ -156,9 +175,9 @@ try
     {
         Write-Host "`nSet owner for catalog '$catalog' ..."
         $dbCatalog = $dbObject.FullTextCatalogs[$catalog]
-        $dbCatalog.Owner = $databaseUserName
+        $dbCatalog.Owner = $dbUserName
         $dbCatalog.Alter()
-        Write-Host("`tUser $databaseUserName successfully own catalog $dbCatalog.") -ForegroundColor green
+        Write-Host("`tUser $dbUserName successfully own catalog $dbCatalog.") -ForegroundColor green
     }
 }
 catch [Exception]
