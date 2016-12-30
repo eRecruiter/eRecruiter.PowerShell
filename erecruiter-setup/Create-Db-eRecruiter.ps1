@@ -10,6 +10,8 @@ Create an empty database and an user with access to this database for the eRecru
 
 Requirements:
     - Sql server
+
+Optional:
     - Sql "super" user (to create the database and add a user)
     - user with database access (default language "German", password never expires)   
 
@@ -42,11 +44,13 @@ If no value for parameter "dbSuperUserName" is provided, this parameter is ignor
 .Parameter dbUserLoginName
 
 (Optional) The database user, who has access to the server, has priviliges to create the database and users.
+This user will be created if provided.
+No windows login can be created with this parameter.
 
 .Parameter dbUserName
 
 (Optional) The database user, who should access to the database server provided in parameter "dbName".
-If none or no "dbUserPassword" is provided the current user who executes this script is used.
+If none or no "dbUserPassword" is provided the current user who executes this script is used and assigned as owner to the created database.
 
 .Parameter dbUserPassword
 
@@ -79,16 +83,36 @@ function WriteWarning( $warningText ) {
     echo $_.Exception|format-list -force
 }
 
+function PromptForChoice ( $caption, $message, $yesMessage, $noMessage, $defaultChoice = 0) {
+    $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", $yesMessage
+    $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", $noMessage
+    $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+    return $host.ui.PromptForChoice($caption, $message, $options, $defaultChoice)
+}
+
+# Parameter validation
+# - if a login user is provided a password must be provided
+if ([string]::IsNullOrEmpty($dbUserLoginName) -eq $false -and [string]::IsNullOrEmpty($dbUserPassword)) {
+    Write-Warning "A login user is provided in parameter 'dbUserLoginName', but no password in parameter 'dbUserPassword'."
+    $result = PromptForChoice("Do you want to continue? (Y/N)")
+    if ($result -eq 1) {
+        # No selected
+        exit
+    }
+}
+$currentUser = $(whoami)
+
 # Connect to sql server
 [System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO') | out-null
 $server = new-Object ('Microsoft.SqlServer.Management.Smo.Server') "$databaseServer"
 
 #If super user credentials are provided, check if they are valid and sign the user in
-if ([string]::IsNullOrEmpty($dbSuperUserName)) {   
+if ([string]::IsNullOrEmpty($databaseSuperUser)) {   
     Write-Host "Using windows integrated connection to connect sql server."
+    $databaseSuperUser = $currentUser
 }
 else {
-    Write-Host "Using mixed-mode connection with provided credentials 'super user: $databaseSuperUserName' to connect sql server."
+    Write-Host "Using mixed-mode connection with provided credentials 'super user: $databaseSuperUser' to connect sql server."
     #Default connection is via Windows integrated, need to tell Powershell we do NOT want that
     $server.ConnectionContext.LoginSecure=$false; 
 
@@ -96,21 +120,7 @@ else {
     $server.ConnectionContext.set_Password("$databaseSuperUserPassword") 
 }
 
-#If database user credentials are provided, check if they are valid and sign the user in
-if ([string]::IsNullOrEmpty($dbUserLoginName) -or [string]::IsNullOrEmpty($dbUserName)) {   
-    Write-Host "Using windows integrated connection to connect sql server."
-    $currentUser = $(whoami)
-    Write-Host "Current user is " $currentUser
-    $databaseUserLoginName = $databaseUserName = $currentUser
-    $databaseUserPassword = "TODO GET password"
-}
-else {
-    $databaseUserLoginName = $dbUserLoginName
-    $databaseUserName = $dbUserName
-    $databaseUserPassword = $dbUserPassword
-}
-
-# Step (1) -- Validating user credentials
+# Step (1) -- Validating user credentials to ensure database exists and the super user has access.
 #########################################
 try{
     Write-Host "Validating user credentials ..."
@@ -122,25 +132,29 @@ catch {
     exit -1
 }
 
+if ([string]::IsNullOrEmpty($dbUserLoginName) -eq $false) {
+    $databaseUserLoginName = $dbUserLoginName
+    $databaseUserPassword = $dbUserPassword
+}
 
-# Step (2) -- Check if database exists
+if ([string]::IsNullOrEmpty($dbUserName)) {
+    #$databaseUserName = $currentUser
+    #Write-Host "No user was provided in parameter 'dbUserName', so the current user '$currentUser' is used."
+}
+else {
+    $databaseUserName = $dbUserName
+}
+
+# Step (2) -- Check if database exists and let the user choose if database should be overwritten.
 ######################################
 $dbObject = $server.Databases[$databaseName] #create SMO handle to database
 
 if ($dbObject)
 {
-    $title = "`nDatabase $databaseName already exists!"
-    $message = "Do you want to delete the existing database?"
-
-    $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", `
-        "Deletes the existing database."
-
-    $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No", `
-        "Exit the script and leave database untouched"
-
-    $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
-
-    $result = $host.ui.PromptForChoice($title, $message, $options, 1) 
+    $result = PromptForChoice("`nDatabase $databaseName already exists!", 
+        "Do you want to delete the existing database?",
+        "Deletes the existing database.",
+        "Exit the script and leave database untouched", 1) 
 
     switch ($result){
         0 {
@@ -170,76 +184,90 @@ catch {
     exit -3
 }
 
-
-# Step (4) -- Add user to sql-server login
+# Step (4) -- Add provided database login user to sql-server login.
 ##########################################
-try
-{
-    Write-Host "`nCreate login for sql server ..."
-    # drop login if it exists
-    if ($server.Logins.Contains($databaseUserLoginName))  
-    {   
-        $server.KillAllprocesses($databaseName)
-        Write-Host("`tDeleting the existing login $databaseUserLoginName.")
-        $server.Logins[$databaseUserLoginName].Drop() 
+if ([string]::IsNullOrEmpty($databaseUserLoginName) -eq $false -and [string]::IsNullOrEmpty($databaseUserPassword) -eq $false) {
+    try
+    {
+        Write-Host "`nCreate login '$databaseUserLoginName' for sql server ..."
+        # drop login if it exists
+        if ($server.Logins.Contains($databaseUserLoginName))  
+        {
+            $server.KillAllprocesses($databaseName)
+            Write-Host("`tDeleting the existing login $databaseUserLoginName.")
+            $server.Logins[$databaseUserLoginName].Drop() 
+        }
+
+        $login = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Login -ArgumentList $server, $databaseUserLoginName
+        $login.LoginType = [Microsoft.SqlServer.Management.Smo.LoginType]::SqlLogin
+        $login.PasswordExpirationEnabled = $false
+        $login.PasswordPolicyEnforced = $false
+        $login.Create($databaseUserPassword)
+        Write-Host("`tLogin $databaseUserLoginName created successfully.") -ForegroundColor green
     }
-
-    $login = New-Object -TypeName Microsoft.SqlServer.Management.Smo.Login -ArgumentList $server, $databaseUserLoginName
-    $login.LoginType = [Microsoft.SqlServer.Management.Smo.LoginType]::SqlLogin
-    $login.PasswordExpirationEnabled = $false
-    $login.Create($databaseUserPassword)
-    Write-Host("`tLogin $databaseUserLoginName created successfully.") -ForegroundColor green
-
+    catch [Exception]
+    {
+        WriteWarning "(4) Creating login for sql server failed!"   
+        exit -4
+    }
 }
-catch [Exception]
-{
-    WriteWarning "(4) Creating login for sql server failed!"   
-    exit -4
-}
-
 
 # Step (5) -- Create user for database access
 #############################################
-try
-{
-    Write-Host "`nCreate user for database access ..."
-    $dbObject = $server.Databases[$DatabaseName]
-
-    # drop user if it exists
-    if ($dbObject.Users[$databaseUserName])
+# Access database to create either a user or assign the user to the db_owner role.
+if ([string]::IsNullOrEmpty($databaseUserName) -eq $false) {
+    try
     {
-        Write-Host("Dropping user $databaseUserName on $dbObject.")
-        $dbObject.Users[$databaseUserName].Drop()
+        Write-Host "`nCreate user '$databaseUserName' for database access ..."
+        #Recreate SMO handle to database here to ensure connection.
+        $dbObject = $server.Databases[$DatabaseName]
+        $createDbUser = $true
+        # Check if user exists and drop user if it exists
+        if ($dbObject.Users -and $dbObject.Users[$databaseUserName])
+        {
+            $result = PromptForChoice("`nUser '$databaseUserName' already exists!", 
+                "Do you want to delete and recreate the existing user?",
+                "", "", 1)
+            switch ($result){
+                0 {
+                    # Yes selected, drop and recreate the user.
+                    Write-Host("Dropping user $databaseUserName on $dbObject.")
+                    $dbObject.Users[$databaseUserName].Drop()
+                }
+                1 {
+                    $createDbUser = $false
+                }
+            }
+        }
+        if ($createDbUser) {
+            $dbUser = New-Object -TypeName Microsoft.SqlServer.Management.Smo.User -ArgumentList $dbObject, $databaseUserName
+            $dbUser.Login = $databaseUserName
+            $dbUser.Create()
+            Write-Host("`tUser $dbUser created successfully.") -ForegroundColor green
+        }
+    }
+    catch [Exception]
+    {
+        WriteWarning "(5) Creating user for database access failed!"   
+        exit -5
     }
 
-    $dbUser = New-Object -TypeName Microsoft.SqlServer.Management.Smo.User -ArgumentList $dbObject, $databaseUserName
-    $dbUser.Login = $databaseUserName
-    $dbUser.Create()
-    Write-Host("`tUser $dbUser created successfully.") -ForegroundColor green
-}
-catch [Exception]
-{
-    WriteWarning "(5) Creating user for database access failed!"   
-    exit -5
-}
+    # Step (6) -- Assign database role to user
+    ##########################################
+    try
+    {
+        $roleName = "db_owner"
 
-
-# Step (6) -- Assign database role to user
-##########################################
-try
-{
-    $roleName = "db_owner"
-
-    Write-Host "`nAssign database role '$roleName' to user ..."
-    $dbrole = $dbObject.Roles[$roleName]
-    $dbrole.AddMember($databaseUserName)
-    $dbrole.Alter()
-    Write-Host("`tUser $dbUser successfully added to $roleName role.") -ForegroundColor green
+        Write-Host "`nAssign database role '$roleName' to user '$databaseUserName' ..."
+        $dbrole = $dbObject.Roles[$roleName]
+        $dbrole.AddMember($databaseUserName)
+        $dbrole.Alter()
+        Write-Host("`tUser $dbUser successfully added to $roleName role.") -ForegroundColor green
+    }
+    catch [Exception]
+    {
+        WriteWarning "(6) Assign database role '$roleName' to user failed!"   
+        exit -6
+    }
 }
-catch [Exception]
-{
-    WriteWarning "Assign database role '$roleName' to user failed!"   
-    exit -6
-}
-
 Write-Host "`n`n!!! Script finished !!!`n`n" -ForegroundColor green
