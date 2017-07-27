@@ -80,7 +80,7 @@ $databaseSuperUserPassword = $dbSuperUserPassword
 ###########################################
 function WriteWarning( $warningText ) {
     Write-Warning $warningText
-    echo $_.Exception|format-list -force
+    Write-Output $_.Exception|format-list -force
 }
 
 function PromptForChoice ( $caption, $message, $yesMessage, $noMessage, $defaultChoice = 0) {
@@ -124,7 +124,7 @@ else {
 #########################################
 try{
     Write-Host "Validating user credentials ..."
-    $server.databases | Select Name  | Out-Null
+    $server.databases | Select-Object Name  | Out-Null
     Write-Host "`tOK"  -ForegroundColor green
 }
 catch {

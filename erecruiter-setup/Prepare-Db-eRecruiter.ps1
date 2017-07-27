@@ -69,7 +69,7 @@ function CheckPath( $path ) {
 
 function WriteWarning( $warningText ) {
     Write-Warning $warningText
-    echo $_.Exception|format-list -force
+    Write-Output $_.Exception|format-list -force
 }
 
 # Folder structure validation
@@ -105,7 +105,7 @@ else {
 #########################################
 try{
     Write-Host "Validating user credentials ..."
-    $server.databases | Select Name  | Out-Null
+    $server.databases | Select-Object Name  | Out-Null
     Write-Host "`tOK"  -ForegroundColor green
 }
 catch {
@@ -147,43 +147,44 @@ catch [Exception]
 
 # Step (4) -- Assign user to schema owner
 #########################################
-try
-{
-    $schemas = @("db_owner","ecBase","OrderManagement")
-    foreach($schema in $schemas)
+if ([string]::IsNullOrEmpty($dbUserName) -eq $false) {
+    try
     {
-        Write-Host "`nSet owner for schema '$schema' ..."
-        $dbSchema = $dbObject.Schemas[$schema]
-        $dbSchema.Owner = $dbUserName
-        $dbSchema.Alter()
-        Write-Host("`tUser $dbUserName successfully own schema $dbSchema.") -ForegroundColor green
+        $schemas = @("db_owner", "ecBase", "OrderManagement")
+        foreach($schema in $schemas)
+        {
+            Write-Host "`nSet owner for schema '$schema' ..."
+            $dbSchema = $dbObject.Schemas[$schema]
+            $dbSchema.Owner = $dbUserName
+            $dbSchema.Alter()
+            Write-Host("`tUser $dbUserName successfully own schema $dbSchema.") -ForegroundColor green
+        }
     }
-}
-catch [Exception]
-{
-    WriteWarning "`nAssign user as schema owner failed!"   
-    exit -4
-}
-
-
-# Step (5) -- Assign user to owner of FullTextCatalog and QuickSearchCatalog
-############################################################################
-try
-{
-    $catalogs = @("FullTextCatalog","QuickSearchCatalog")
-    foreach($catalog in $catalogs)
+    catch [Exception]
     {
-        Write-Host "`nSet owner for catalog '$catalog' ..."
-        $dbCatalog = $dbObject.FullTextCatalogs[$catalog]
-        $dbCatalog.Owner = $dbUserName
-        $dbCatalog.Alter()
-        Write-Host("`tUser $dbUserName successfully own catalog $dbCatalog.") -ForegroundColor green
+        WriteWarning "`nAssign user as schema owner failed!"   
+        exit -4
     }
-}
-catch [Exception]
-{
-    WriteWarning "`nAssign user as catalog owner failed!"   
-    exit -5
+
+    # Step (5) -- Assign user to owner of FullTextCatalog and QuickSearchCatalog
+    ############################################################################
+    try
+    {
+        $catalogs = @("FullTextCatalog","QuickSearchCatalog")
+        foreach($catalog in $catalogs)
+        {
+            Write-Host "`nSet owner for catalog '$catalog' ..."
+            $dbCatalog = $dbObject.FullTextCatalogs[$catalog]
+            $dbCatalog.Owner = $dbUserName
+            $dbCatalog.Alter()
+            Write-Host("`tUser $dbUserName successfully own catalog $dbCatalog.") -ForegroundColor green
+        }
+    }
+    catch [Exception]
+    {
+        WriteWarning "`nAssign user as catalog owner failed!"   
+        exit -5
+    }
 }
 
 Write-Host "`n`n!!! Script prepare db for eRecruiter application finished !!!`n`n" -ForegroundColor green
